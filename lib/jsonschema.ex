@@ -1,11 +1,13 @@
 defmodule JSONSchema do
+  @type jsonscheme_type :: :integer | :number | :boolean | :array | :string | :object
+
   @type schema_result :: %{
           required(:"$id") => String.t(),
           optional(:properties) => map,
-          required(:type) => String.t()
+          required(:type) => jsonscheme_type
         }
 
-  @spec field_typedef_simple(String.t(), String.t(), String.t(), keyword()) :: schema_result
+  @spec field_typedef_simple(String.t(), String.t(), atom, keyword()) :: schema_result
   defp field_typedef_simple(root, name, type, meta \\ []) do
     %{
       "$id": root <> "/properties/" <> name,
@@ -25,24 +27,24 @@ defmodule JSONSchema do
 
     case typedef do
       {:type, _lineno, :integer, []} ->
-        field_typedef_simple(root, field_name, "integer", meta)
+        field_typedef_simple(root, field_name, :integer, meta)
 
       {:type, _lineno, :float, []} ->
-        field_typedef_simple(root, field_name, "number", meta)
+        field_typedef_simple(root, field_name, :number, meta)
 
       {:type, _lineno, :boolean, []} ->
-        field_typedef_simple(root, field_name, "boolean", meta)
+        field_typedef_simple(root, field_name, :boolean, meta)
 
       {:type, _lineno, :list, subtype} ->
-        Map.merge(field_typedef_simple(root, field_name, "array"), %{
+        Map.merge(field_typedef_simple(root, field_name, :array), %{
           items: field_typedef(root, String.to_atom(field_name <> "/items"), hd(subtype))
         })
 
       {:remote_type, _lineno, [{:atom, 0, String}, {:atom, 0, :t}, []]} ->
-        field_typedef_simple(root, field_name, "string", meta)
+        field_typedef_simple(root, field_name, :string, meta)
 
-      {:remote_type, _lineno, [{:atom, 0, module}, {:atom, 0, :t}, []]} ->
-        field_typedef_object(module, root <> "/properties/" <> field_name)
+      {:remote_type, _lineno, [{:atom, 0, module}, {:atom, 0, typename}, []]} ->
+        field_typedef_remotetype(module, typename, root <> "/properties/" <> field_name)
 
       _ ->
         {:error, typedef}
@@ -65,24 +67,28 @@ defmodule JSONSchema do
     end
   end
 
-  @spec field_typedef_object(atom, String.t()) :: schema_result
-  defp field_typedef_object(module, name) do
-    {:ok, [type: typedef]} = Code.Typespec.fetch_types(module)
-    {:t, {:type, _lineno, :map, fields}, []} = typedef
+  @spec field_typedef_remotetype(atom, atom, String.t()) :: schema_result
+  def field_typedef_remotetype(module, typename, name) do
+    {:ok, types_kw} = Code.Typespec.fetch_types(module)
+    types = Enum.map(types_kw, fn {:type, {tname, tspec, []}} -> {tname, tspec} end)
 
-    properties =
-      fields |> Enum.map(&field(module, name, &1)) |> Enum.reject(&is_nil/1) |> Map.new()
+    case types[typename] do
+      {:type, _lineno, :map, fields} ->
+        %{
+          "$id": name,
+          type: :object,
+          properties:
+            fields |> Enum.map(&field(module, name, &1)) |> Enum.reject(&is_nil/1) |> Map.new()
+        }
 
-    %{
-      "$id": name,
-      type: "object",
-      properties: properties
-    }
+      _ ->
+        {:error, types[typename]}
+    end
   end
 
   @spec schema(atom) :: schema_result
   def schema(module) do
-    field_typedef_object(module, "#")
+    field_typedef_remotetype(module, :t, "#")
   end
 
   @spec schema_and_form(atom) :: %{:schema => schema_result, :form => any}
@@ -99,5 +105,4 @@ defmodule JSONSchema do
       ]
     }
   end
-
 end

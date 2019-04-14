@@ -9,19 +9,19 @@ defmodule JSONSchemaTest do
     assert JSONSchema.schema(TestWorld.User) == %{
              "$id": "#",
              properties: %{
-               active: %{"$id": "#/properties/active", type: "boolean"},
-               id: %{"$id": "#/properties/id", type: "integer"},
-               name: %{"$id": "#/properties/name", type: "string"},
+               active: %{"$id": "#/properties/active", type: :boolean},
+               id: %{"$id": "#/properties/id", type: :integer},
+               name: %{"$id": "#/properties/name", type: :string},
                signins: %{
                  "$id": "#/properties/signins",
-                 type: "array",
+                 type: :array,
                  items: %{
                    "$id": "#/properties/signins/items",
-                   type: "integer"
+                   type: :integer
                  }
                }
              },
-             type: "object"
+             type: :object
            }
   end
 
@@ -31,14 +31,14 @@ defmodule JSONSchemaTest do
              properties: %{
                company: %{
                  "$id": "#/properties/company",
-                 type: "object",
+                 type: :object,
                  properties: %{
-                   domain: %{"$id": "#/properties/company/properties/domain", type: "string"},
-                   id: %{"$id": "#/properties/company/properties/id", type: "integer"},
-                   name: %{"$id": "#/properties/company/properties/name", type: "string"},
+                   domain: %{"$id": "#/properties/company/properties/domain", type: :string},
+                   id: %{"$id": "#/properties/company/properties/id", type: :integer},
+                   name: %{"$id": "#/properties/company/properties/name", type: :string},
                    rating: %{
                      "$id": "#/properties/company/properties/rating",
-                     type: "number",
+                     type: :number,
                      examples: [5.0],
                      title: "Your Rating"
                    }
@@ -47,22 +47,22 @@ defmodule JSONSchemaTest do
                user: %{
                  "$id": "#/properties/user",
                  properties: %{
-                   active: %{"$id": "#/properties/user/properties/active", type: "boolean"},
-                   id: %{"$id": "#/properties/user/properties/id", type: "integer"},
-                   name: %{"$id": "#/properties/user/properties/name", type: "string"},
+                   active: %{"$id": "#/properties/user/properties/active", type: :boolean},
+                   id: %{"$id": "#/properties/user/properties/id", type: :integer},
+                   name: %{"$id": "#/properties/user/properties/name", type: :string},
                    signins: %{
                      "$id": "#/properties/user/properties/signins",
-                     type: "array",
+                     type: :array,
                      items: %{
                        "$id": "#/properties/user/properties/signins/items",
-                       type: "integer"
+                       type: :integer
                      }
                    }
                  },
-                 type: "object"
+                 type: :object
                }
              },
-             type: "object"
+             type: :object
            }
   end
 
@@ -70,17 +70,17 @@ defmodule JSONSchemaTest do
     assert JSONSchema.schema(TestWorld.Company) == %{
              "$id": "#",
              properties: %{
-               domain: %{"$id": "#/properties/domain", type: "string"},
-               id: %{"$id": "#/properties/id", type: "integer"},
-               name: %{"$id": "#/properties/name", type: "string"},
+               domain: %{"$id": "#/properties/domain", type: :string},
+               id: %{"$id": "#/properties/id", type: :integer},
+               name: %{"$id": "#/properties/name", type: :string},
                rating: %{
                  "$id": "#/properties/rating",
-                 type: "number",
+                 type: :number,
                  examples: [5.0],
                  title: "Your Rating"
                }
              },
-             type: "object"
+             type: :object
            }
   end
 end
