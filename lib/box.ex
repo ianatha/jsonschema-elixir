@@ -8,7 +8,7 @@ defmodule Box do
   def reduce_meta_attrs({k, v}, acc) do
     if String.starts_with?(Atom.to_string(k), "__") do
       last_keyword = acc |> hd |> elem(0)
-      Keyword.get_and_update(acc, last_keyword, &{&1, Keyword.put_new(&1, String.to_atom(String.trim(Atom.to_string(k), "_")), v)}) |> elem(1)
+      Keyword.get_and_update(acc, last_keyword, &{&1, Keyword.put_new(&1, k |> Atom.to_string |> String.trim("_") |> String.to_atom, v)}) |> elem(1)
     else
       Keyword.put_new(acc, k, [])
     end
