@@ -6,15 +6,6 @@ defmodule JSONSchema do
     }
   end
 
-  defp schema_properties(x, root) do
-    import Enum, only: [map: 2, reject: 2]
-
-    {:ok, [type: typedef]} = Code.Typespec.fetch_types(x)
-    {:t, {:type, _lineno, :map, fields}, []} = typedef
-
-    fields |> map(&field(root, &1)) |> reject(&is_nil/1)
-  end
-
   defp field_typedef(root, field_name, typedef) do
     case typedef do
       {:type, _lineno, :integer, []} ->
@@ -32,10 +23,10 @@ defmodule JSONSchema do
         field_typedef_simple(root, field_name, "string")
 
       {:remote_type, _lineno, [{:atom, 0, module}, {:atom, 0, :t}, []]} ->
-        schema(module, root <> "/properties/" <> field_name)
+        field_typedef_object(module, root <> "/properties/" <> field_name)
 
       _ ->
-        :error
+        {:error, typedef}
     end
   end
 
@@ -48,14 +39,21 @@ defmodule JSONSchema do
   end
 
   def schema(module) do
-    schema(module, "#")
+    field_typedef_object(module, "#")
   end
 
-  def schema(module, name) do
+  def field_typedef_object(module, name) do
+    import Enum, only: [map: 2, reject: 2]
+
+    {:ok, [type: typedef]} = Code.Typespec.fetch_types(module)
+    {:t, {:type, _lineno, :map, fields}, []} = typedef
+
+    properties = fields |> map(&field(name, &1)) |> reject(&is_nil/1)
+
     %{
       "$id": name,
       type: "object",
-      properties: schema_properties(module, name)
+      properties: properties
     }
   end
 
