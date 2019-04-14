@@ -5,6 +5,17 @@ defmodule JSONSchemaTest do
     assert TestWorld.Company.__meta()[:rating][:title] == "Your Rating"
   end
 
+  test "generates correct schema for TestWorld.Order" do
+    assert JSONSchema.schema(TestWorld.Order) == %{
+             "$id": "#",
+             properties: %{
+               id: %{"$id": "#/properties/id", type: :integer},
+               type: %{"$id": "#/properties/type", enum: [:pos, :internet, :phone, :recurring], type: :string}
+             },
+             type: :object
+           }
+  end
+
   test "generates correct schema for TestWorld.User" do
     assert JSONSchema.schema(TestWorld.User) == %{
              "$id": "#",

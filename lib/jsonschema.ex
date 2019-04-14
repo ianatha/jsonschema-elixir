@@ -81,6 +81,13 @@ defmodule JSONSchema do
             fields |> Enum.map(&field(module, name, &1)) |> Enum.reject(&is_nil/1) |> Map.new()
         }
 
+      {:type, _lineno, :union, union_members} ->
+        %{
+          "$id": name,
+          type: :string,
+          enum: Enum.map(union_members, fn ({:atom, _lineno, enumval}) -> enumval end)
+        }
+
       _ ->
         {:error, types[typename]}
     end

@@ -1,11 +1,6 @@
 defmodule TestWorld do
   use Box
 
-  defbox(Demo,
-    name: String.t(),
-    password: String.t(), __type: "password"
-  )
-
   defbox(User,
     id: integer,
     name: String.t(),
@@ -25,5 +20,12 @@ defmodule TestWorld do
   defbox(Account,
     user: User.t(),
     company: Company.t()
+  )
+
+  @type order_type :: :pos | :internet | :phone | :recurring
+
+  defbox(Order,
+    id: integer,
+    type: TestWorld.order_type()
   )
 end
