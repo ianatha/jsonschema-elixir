@@ -1,7 +1,7 @@
 defmodule JSONSchemaTest do
   use ExUnit.Case
 
-  test "boxing metadata" do
+  test "boxing metadata is captured correctly" do
     assert TestWorld.Company.__meta()[:rating][:title] == "Your Rating"
   end
 
@@ -36,7 +36,12 @@ defmodule JSONSchemaTest do
                    domain: %{"$id": "#/properties/company/properties/domain", type: "string"},
                    id: %{"$id": "#/properties/company/properties/id", type: "integer"},
                    name: %{"$id": "#/properties/company/properties/name", type: "string"},
-                   rating: %{"$id": "#/properties/company/properties/rating", type: "number"}
+                   rating: %{
+                     "$id": "#/properties/company/properties/rating",
+                     type: "number",
+                     examples: [5.0],
+                     title: "Your Rating"
+                   }
                  }
                },
                user: %{
@@ -68,7 +73,12 @@ defmodule JSONSchemaTest do
                domain: %{"$id": "#/properties/domain", type: "string"},
                id: %{"$id": "#/properties/id", type: "integer"},
                name: %{"$id": "#/properties/name", type: "string"},
-               rating: %{"$id": "#/properties/rating", type: "number"}
+               rating: %{
+                 "$id": "#/properties/rating",
+                 type: "number",
+                 examples: [5.0],
+                 title: "Your Rating"
+               }
              },
              type: "object"
            }
