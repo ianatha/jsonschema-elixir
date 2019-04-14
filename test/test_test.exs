@@ -4,7 +4,7 @@ defmodule JSONSchemaTest do
   test "generates correct schema for TestWorld.User" do
     assert JSONSchema.schema(TestWorld.User) == %{
              "$id": "#",
-             properties: [
+             properties: %{
                active: %{"$id": "#/properties/active", type: "boolean"},
                id: %{"$id": "#/properties/id", type: "integer"},
                name: %{"$id": "#/properties/name", type: "string"},
@@ -16,7 +16,7 @@ defmodule JSONSchemaTest do
                    type: "integer"
                  }
                }
-             ],
+             },
              type: "object"
            }
   end
@@ -24,20 +24,20 @@ defmodule JSONSchemaTest do
   test "generates correct schema for TestWorld.Account" do
     assert JSONSchema.schema(TestWorld.Account) == %{
              "$id": "#",
-             properties: [
+             properties: %{
                company: %{
                  "$id": "#/properties/company",
                  type: "object",
-                 properties: [
+                 properties: %{
                    domain: %{"$id": "#/properties/company/properties/domain", type: "string"},
                    id: %{"$id": "#/properties/company/properties/id", type: "integer"},
                    name: %{"$id": "#/properties/company/properties/name", type: "string"},
                    rating: %{"$id": "#/properties/company/properties/rating", type: "number"}
-                 ]
+                 }
                },
                user: %{
                  "$id": "#/properties/user",
-                 properties: [
+                 properties: %{
                    active: %{"$id": "#/properties/user/properties/active", type: "boolean"},
                    id: %{"$id": "#/properties/user/properties/id", type: "integer"},
                    name: %{"$id": "#/properties/user/properties/name", type: "string"},
@@ -49,10 +49,10 @@ defmodule JSONSchemaTest do
                        type: "integer"
                      }
                    }
-                 ],
+                 },
                  type: "object"
                }
-             ],
+             },
              type: "object"
            }
   end
@@ -60,12 +60,12 @@ defmodule JSONSchemaTest do
   test "generates correct schema for TestWorld.Company" do
     assert JSONSchema.schema(TestWorld.Company) == %{
              "$id": "#",
-             properties: [
+             properties: %{
                domain: %{"$id": "#/properties/domain", type: "string"},
                id: %{"$id": "#/properties/id", type: "integer"},
                name: %{"$id": "#/properties/name", type: "string"},
                rating: %{"$id": "#/properties/rating", type: "number"}
-             ],
+             },
              type: "object"
            }
   end

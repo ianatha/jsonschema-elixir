@@ -51,7 +51,7 @@ defmodule JSONSchema do
     {:ok, [type: typedef]} = Code.Typespec.fetch_types(module)
     {:t, {:type, _lineno, :map, fields}, []} = typedef
 
-    properties = fields |> map(&field(name, &1)) |> reject(&is_nil/1)
+    properties = fields |> map(&field(name, &1)) |> reject(&is_nil/1) |> Map.new()
 
     %{
       "$id": name,
