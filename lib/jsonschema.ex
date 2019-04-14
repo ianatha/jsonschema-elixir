@@ -1,4 +1,5 @@
 defmodule JSONSchema do
+  @spec field_typedef_simple(String.t(), String.t(), String.t()) :: map
   defp field_typedef_simple(root, name, type) do
     %{
       "$id": root <> "/properties/" <> name,
@@ -6,6 +7,7 @@ defmodule JSONSchema do
     }
   end
 
+  @spec field_typedef(String.t(), String.t(), map) :: {:error, map} | map
   defp field_typedef(root, field_name, typedef) do
     case typedef do
       {:type, _lineno, :integer, []} ->
@@ -41,11 +43,8 @@ defmodule JSONSchema do
     {field_name, field_typedef(root, Atom.to_string(field_name), typedef |> hd)}
   end
 
-  def schema(module) do
-    field_typedef_object(module, "#")
-  end
-
-  def field_typedef_object(module, name) do
+  @spec field_typedef_object(String.t(), String.t()) :: map
+  defp field_typedef_object(module, name) do
     import Enum, only: [map: 2, reject: 2]
 
     {:ok, [type: typedef]} = Code.Typespec.fetch_types(module)
@@ -60,7 +59,8 @@ defmodule JSONSchema do
     }
   end
 
-  def schemaFromModule(module) do
-    field_typedef("#", "root", {:remote_type, 0, [{:atom, 0, module}, {:atom, 0, :t}, []]})
+  @spec schema(atom()) :: map
+  def schema(module) do
+    field_typedef_object(module, "#")
   end
 end
