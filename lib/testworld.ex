@@ -9,10 +9,10 @@ defmodule TestWorld do
   )
 
   defbox(Company,
-    id: integer,
-    name: String.t(),
-    domain: String.t(),
-    rating: float
+    id: integer, __example: 1,
+    name: String.t(), __example: "Acme",
+    domain: String.t(), __example: "acme.com",
+    rating: float, __example: 5.0, __title: "Your Rating"
   )
 
   defbox(Account,

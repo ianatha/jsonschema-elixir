@@ -1,6 +1,10 @@
 defmodule JSONSchemaTest do
   use ExUnit.Case
 
+  test "boxing metadata" do
+    assert TestWorld.Company.__meta()[:rating][:title] == "Your Rating"
+  end
+
   test "generates correct schema for TestWorld.User" do
     assert JSONSchema.schema(TestWorld.User) == %{
              "$id": "#",

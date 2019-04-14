@@ -1,9 +1,9 @@
 defmodule JSONSchema do
   @type schema_result :: %{
-    required(:"$id") => String.t,
-    optional(:properties) => map,
-    required(:type) => String.t
-  }
+          required(:"$id") => String.t(),
+          optional(:properties) => map,
+          required(:type) => String.t()
+        }
 
   @spec field_typedef_simple(String.t(), String.t(), String.t()) :: schema_result
   defp field_typedef_simple(root, name, type) do
@@ -45,12 +45,13 @@ defmodule JSONSchema do
     nil
   end
 
-  @spec field(String.t, {:type, integer, :map_field_exact, nonempty_maybe_improper_list()}) :: nil | {atom(), {:error, map()} | map()}
+  @spec field(String.t(), {:type, integer, :map_field_exact, nonempty_maybe_improper_list()}) ::
+          nil | {atom(), {:error, map()} | map()}
   defp field(root, {:type, _lineno, :map_field_exact, [{:atom, _, field_name} | typedef]}) do
     {field_name, field_typedef(root, Atom.to_string(field_name), typedef |> hd)}
   end
 
-  @spec field_typedef_object(atom(), String.t) :: schema_result
+  @spec field_typedef_object(atom(), String.t()) :: schema_result
   defp field_typedef_object(module, name) do
     import Enum, only: [map: 2, reject: 2]
 
