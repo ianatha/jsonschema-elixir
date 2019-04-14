@@ -1,6 +1,6 @@
-defmodule JsonschemaElixir do
+defmodule JSONSchema do
   @moduledoc """
-  Documentation for JsonschemaElixir.
+  Documentation for JSONSchema.
   """
 
   @doc """
@@ -8,7 +8,7 @@ defmodule JsonschemaElixir do
 
   ## Examples
 
-      iex> JsonschemaElixir.hello()
+      iex> JSONSchema.hello()
       :world
 
   """
