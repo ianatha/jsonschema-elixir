@@ -6,6 +6,9 @@ defmodule RestPlug do
   def call(conn, _opts) do
     conn
     |> put_resp_content_type("text/json")
-    |> send_resp(200, Poison.encode!(JSONSchema.schema(TestWorld.User)))
+    |> put_resp_header("Access-Control-Allow-Origin", "*")
+    |> send_resp(200, Poison.encode!(
+    	JSONSchema.schema_and_form(TestWorld.Demo)
+    ))
   end
 end

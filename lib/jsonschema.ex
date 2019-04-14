@@ -84,4 +84,20 @@ defmodule JSONSchema do
   def schema(module) do
     field_typedef_object(module, "#")
   end
+
+  @spec schema_and_form(atom) :: %{:schema => schema_result, :form => any}
+  def schema_and_form(module) do
+    %{
+      schema: schema(module),
+      form: [
+        %{
+          key: "name"
+        },
+        %{
+          key: "password"
+        }
+      ]
+    }
+  end
+
 end
