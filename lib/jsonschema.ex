@@ -14,6 +14,9 @@ defmodule JSONSchema do
       {:type, _lineno, :float, []} ->
         field_typedef_simple(root, field_name, "number")
 
+      {:type, _lineno, :boolean, []} ->
+        field_typedef_simple(root, field_name, "boolean")
+
       {:type, _lineno, :list, subtype} ->
         Map.merge(field_typedef_simple(root, field_name, "array"), %{
           items: field_typedef(root, field_name <> "/items", hd(subtype))

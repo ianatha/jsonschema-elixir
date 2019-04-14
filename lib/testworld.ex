@@ -4,7 +4,8 @@ defmodule TestWorld do
   defbox(User,
     id: integer,
     name: String.t(),
-    signins: list(integer())
+    signins: list(integer()),
+    active: boolean
   )
 
   defbox(Company,

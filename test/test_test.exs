@@ -5,6 +5,7 @@ defmodule JSONSchemaTest do
     assert JSONSchema.schema(TestWorld.User) == %{
              "$id": "#",
              properties: [
+               active: %{"$id": "#/properties/active", type: "boolean"},
                id: %{"$id": "#/properties/id", type: "integer"},
                name: %{"$id": "#/properties/name", type: "string"},
                signins: %{
@@ -37,6 +38,7 @@ defmodule JSONSchemaTest do
                user: %{
                  "$id": "#/properties/user",
                  properties: [
+                   active: %{"$id": "#/properties/user/properties/active", type: "boolean"},
                    id: %{"$id": "#/properties/user/properties/id", type: "integer"},
                    name: %{"$id": "#/properties/user/properties/name", type: "string"},
                    signins: %{
