@@ -6,7 +6,15 @@ defmodule JSONSchemaTest do
              "$id": "#",
              properties: [
                id: %{"$id": "#/properties/id", type: "integer"},
-               name: %{"$id": "#/properties/name", type: "string"}
+               name: %{"$id": "#/properties/name", type: "string"},
+               signins: %{
+                 "$id": "#/properties/signins",
+                 type: "array",
+                 items: %{
+                   "$id": "#/properties/signins/items",
+                   type: "integer"
+                 }
+               }
              ],
              type: "object"
            }
@@ -30,7 +38,15 @@ defmodule JSONSchemaTest do
                  "$id": "#/properties/user",
                  properties: [
                    id: %{"$id": "#/properties/user/properties/id", type: "integer"},
-                   name: %{"$id": "#/properties/user/properties/name", type: "string"}
+                   name: %{"$id": "#/properties/user/properties/name", type: "string"},
+                   signins: %{
+                     "$id": "#/properties/user/properties/signins",
+                     type: "array",
+                     items: %{
+                       "$id": "#/properties/user/properties/signins/items",
+                       type: "integer"
+                     }
+                   }
                  ],
                  type: "object"
                }

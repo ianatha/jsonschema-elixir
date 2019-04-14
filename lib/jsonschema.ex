@@ -1,7 +1,7 @@
 defmodule JSONSchema do
   defp field_typedef_simple(root, name, type) do
     %{
-      "$id": root <> "/properties/" <> Atom.to_string(name),
+      "$id": root <> "/properties/" <> name,
       type: type
     }
   end
@@ -12,38 +12,39 @@ defmodule JSONSchema do
     {:ok, [type: typedef]} = Code.Typespec.fetch_types(x)
     {:t, {:type, _lineno, :map, fields}, []} = typedef
 
-    fields |> map(&remove_lineno/1) |> map(&field(root, &1)) |> reject(&is_nil/1)
-  end
-
-  defp remove_lineno(t) do
-    Tuple.delete_at(t, 1)
+    fields |> map(&field(root, &1)) |> reject(&is_nil/1)
   end
 
   defp field_typedef(root, field_name, typedef) do
     case typedef do
-      {:type, :integer, []} ->
+      {:type, _lineno, :integer, []} ->
         field_typedef_simple(root, field_name, "integer")
 
-      {:type, :float, []} ->
+      {:type, _lineno, :float, []} ->
         field_typedef_simple(root, field_name, "number")
 
-      {:remote_type, [{:atom, 0, String}, {:atom, 0, :t}, []]} ->
+      {:type, _lineno, :list, subtype} ->
+        Map.merge(field_typedef_simple(root, field_name, "array"), %{
+          items: field_typedef(root, field_name <> "/items", hd(subtype))
+        })
+
+      {:remote_type, _lineno, [{:atom, 0, String}, {:atom, 0, :t}, []]} ->
         field_typedef_simple(root, field_name, "string")
 
-      {:remote_type, [{:atom, 0, module}, {:atom, 0, :t}, []]} ->
-        schema(module, root <> "/properties/" <> Atom.to_string(field_name))
+      {:remote_type, _lineno, [{:atom, 0, module}, {:atom, 0, :t}, []]} ->
+        schema(module, root <> "/properties/" <> field_name)
 
       _ ->
-        typedef
+        :error
     end
   end
 
-  defp field(_root, {:type, :map_field_exact, [{:atom, _, :__struct__} | _]}) do
+  defp field(_root, {:type, _lineno, :map_field_exact, [{:atom, _, :__struct__} | _]}) do
     nil
   end
 
-  defp field(root, {:type, :map_field_exact, [{:atom, _, field_name} | typedef]}) do
-    {field_name, field_typedef(root, field_name, typedef |> Enum.map(&remove_lineno/1) |> hd)}
+  defp field(root, {:type, _lineno, :map_field_exact, [{:atom, _, field_name} | typedef]}) do
+    {field_name, field_typedef(root, Atom.to_string(field_name), typedef |> hd)}
   end
 
   def schema(module) do
@@ -56,5 +57,9 @@ defmodule JSONSchema do
       type: "object",
       properties: schema_properties(module, name)
     }
+  end
+
+  def schemaFromModule(module) do
+    field_typedef("#", "root", {:remote_type, 0, [{:atom, 0, module}, {:atom, 0, :t}, []]})
   end
 end

@@ -3,7 +3,8 @@ defmodule TestWorld do
 
   defbox(User,
     id: integer,
-    name: String.t()
+    name: String.t(),
+    signins: list(integer())
   )
 
   defbox(Company,
