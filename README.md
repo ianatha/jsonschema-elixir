@@ -1,5 +1,8 @@
 # JsonschemaElixir
 
+[![Hex.pm version](https://img.shields.io/hexpm/v/jsonschema.svg)](https://hex.pm/packages/jsonschema)
+[![Hex.pm downloads](https://img.shields.io/hexpm/dt/jsonschema.svg)](https://hex.pm/packages/jsonschema)
+
 **TODO: Add description**
 
 ## Installation
