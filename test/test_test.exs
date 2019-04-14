@@ -1,6 +1,19 @@
 defmodule JSONSchemaTest do
   use ExUnit.Case
 
+  test "type check Box" do
+    a = %TestWorld.ToDo{id: 1, done: false}
+    assert :ok = TestWorld.ToDo.__type_check(a)
+    assert {:error, _} = TestWorld.Order.__type_check(a)
+
+    b = {}
+    assert {:error, _} = TestWorld.ToDo.__type_check(b)
+    assert {:error, _} = TestWorld.Order.__type_check(b)
+
+    c = %TestWorld.ToDo{id: "string", done: false}
+    assert [:ok, :ok, :not_an_integer] = TestWorld.ToDo.__type_check(c)
+  end
+
   test "boxing metadata is captured correctly" do
     assert TestWorld.Company.__meta()[:rating][:title] == "Your Rating"
   end

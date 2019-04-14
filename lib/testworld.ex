@@ -28,4 +28,9 @@ defmodule TestWorld do
     id: integer,
     type: TestWorld.order_type()
   )
+
+  defbox(ToDo,
+    id: integer,
+    done: boolean
+  )
 end
