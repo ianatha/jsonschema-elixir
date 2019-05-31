@@ -32,7 +32,7 @@ defmodule EvalSandbox.RestrictedEvaluator do
   end
 
   defp do_namespace(quoted_code, _namespace) do
-    #IO.inspect(quoted_code)
+    # IO.inspect(quoted_code)
     quoted_code
   end
 
