@@ -24,7 +24,15 @@ defmodule EvalSandbox.RestrictedEvaluator do
     }
   end
 
+  defp do_namespace({:., meta, callref}, namespace) do
+    case hd(callref) do
+      {:__aliases__, _, _} -> {:., meta, callref}
+      a when is_atom(a) -> {:., meta, [:Disallowed] ++ callref}
+    end
+  end
+
   defp do_namespace(quoted_code, _namespace) do
+    #IO.inspect(quoted_code)
     quoted_code
   end
 

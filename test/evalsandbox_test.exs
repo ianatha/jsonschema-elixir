@@ -19,4 +19,13 @@ defmodule EvalSandboxTest do
       EvalSandbox.RestrictedEvaluator.evaluate_restricted(disallowed, TestEvalSandbox)
     end
   end
+
+  test "disallowed erlang-style exception" do
+    assert_raise CompileError, fn ->
+      disallowed = """
+        s = :string.split("a bc", " ")
+      """
+      EvalSandbox.RestrictedEvaluator.evaluate_restricted(disallowed, TestEvalSandbox)
+    end
+  end
 end
