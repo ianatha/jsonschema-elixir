@@ -3,6 +3,7 @@ defmodule EvalSandboxTest do
 
   require TestEvalSandbox
   require EvalSandbox.RestrictedEvaluator
+  require EvalSandbox.TracedEvaluator
 
   test "allowed works" do
     allowed = """
@@ -42,4 +43,25 @@ defmodule EvalSandboxTest do
       EvalSandbox.RestrictedEvaluator.evaluate_restricted(disallowed, TestEvalSandbox)
     end
   end
+
+  test "trace" do
+    allowed = """
+      s = String.reverse("abc")
+      IO.puts(s)
+      s
+    """
+    EvalSandbox.TracedEvaluator.eval(allowed, TestEvalSandbox)
+  end
+
+  test "trace2" do
+    allowed = """
+      s = [1, 2, 3]
+      Enum.each(s, fn x -> 
+      IO.puts(x)
+      end)
+      s
+    """
+    EvalSandbox.TracedEvaluator.eval(allowed, TestEvalSandbox)
+  end
+
 end

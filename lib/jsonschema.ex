@@ -85,7 +85,7 @@ defmodule JSONSchema do
         %{
           "$id": name,
           type: :string,
-          enum: Enum.map(union_members, fn ({:atom, _lineno, enumval}) -> enumval end)
+          enum: Enum.map(union_members, fn {:atom, _lineno, enumval} -> enumval end)
         }
 
       _ ->

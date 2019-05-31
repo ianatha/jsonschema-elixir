@@ -22,6 +22,7 @@ defmodule Test.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+      {:tap, "~> 0.1.5"},
       {:plug_cowboy, "~> 2.0"},
       {:poison, "~> 3.1"},
       {:dialyxir, "~> 1.0.0-rc.6", only: [:dev], runtime: false}

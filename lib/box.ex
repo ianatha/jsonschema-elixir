@@ -7,13 +7,19 @@ defmodule Box do
 
   def type_check2(type, v) do
     case type do
-      {:type, _lineno, :map_field_exact, [{:atom, _lineno2, :__struct__} | _ ]} ->
+      {:type, _lineno, :map_field_exact, [{:atom, _lineno2, :__struct__} | _]} ->
         :ok
-      {:type, _lineno, :map_field_exact, [{:atom, _lineno2, fieldname}, {:type, _lineno3, :integer, []}]} ->
+
+      {:type, _lineno, :map_field_exact,
+       [{:atom, _lineno2, fieldname}, {:type, _lineno3, :integer, []}]} ->
         if(is_integer(Map.get(v, fieldname)), do: :ok, else: :not_an_integer)
-      {:type, _lineno, :map_field_exact, [{:atom, _lineno2, fieldname}, {:type, _lineno3, :boolean, []}]} ->
+
+      {:type, _lineno, :map_field_exact,
+       [{:atom, _lineno2, fieldname}, {:type, _lineno3, :boolean, []}]} ->
         if(is_boolean(Map.get(v, fieldname)), do: :ok, else: :not_a_boolean)
-      v -> {:unknown, v}
+
+      v ->
+        {:unknown, v}
     end
   end
 
@@ -35,7 +41,7 @@ defmodule Box do
   end
 
   def type_check(module, v) do
-    if (not is_map(v)) or (not (v.__struct__ == module)) do
+    if not is_map(v) or not (v.__struct__ == module) do
       {:error, "__struct__ mistmatch"}
     else
       type_check(module, :t, v)
