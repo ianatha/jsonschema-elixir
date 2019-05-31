@@ -34,3 +34,11 @@ defmodule TestWorld do
     done: boolean
   )
 end
+
+
+defmodule TestEvalSandbox do
+  use EvalSandbox
+
+  allow(String, reverse: 1)
+  allow(IO, puts: 1)
+end
