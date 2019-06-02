@@ -65,7 +65,8 @@
 
 -type(func_spec() :: {Module :: module(), Function :: atom()} | function()).
 -type(nlfun_handler() :: fun((FuncSpec :: func_spec(),
-                              Arguments :: [term()]) ->
+                              Arguments :: [term()],
+                              LineNo :: number()) ->
                                     term())).
 -type(non_local_function_handler() :: {value, nlfun_handler()}
                                     | none).
@@ -407,7 +408,7 @@ expr({call,L1,{remote,L2,{record_field,_,{atom,_,''},{atom,_,qlc}=Mod},
       [{lc,_,_E,_Qs} | As0]=As}, 
      Bs, Lf, Ef, RBs) when length(As0) =< 1 ->
     expr({call,L1,{remote,L2,Mod,Func},As}, Bs, Lf, Ef, RBs);
-expr({call,_,{remote,_,Mod,Func},As0}, Bs0, Lf, Ef, RBs) ->
+expr({call,LineNo,{remote,_,Mod,Func},As0}, Bs0, Lf, Ef, RBs) ->
     % HERE HERE HERE
     {value,M,Bs1} = expr(Mod, Bs0, Lf, Ef, none),
     {value,F,Bs2} = expr(Func, Bs0, Lf, Ef, none),
@@ -417,7 +418,7 @@ expr({call,_,{remote,_,Mod,Func},As0}, Bs0, Lf, Ef, RBs) ->
         true ->
             bif(F, As, Bs3, Ef, RBs);
         false ->
-            do_apply(M, F, As, Bs3, Ef, RBs)
+            do_apply(M, F, As, Bs3, Ef, RBs, LineNo)
     end;
 expr({call,_,{atom,_,Func},As0}, Bs0, Lf, Ef, RBs) ->
     case erl_internal:bif(Func, length(As0)) of
@@ -427,14 +428,14 @@ expr({call,_,{atom,_,Func},As0}, Bs0, Lf, Ef, RBs) ->
         false ->
             local_func(Func, As0, Bs0, Lf, Ef, RBs)
     end;
-expr({call,_,Func0,As0}, Bs0, Lf, Ef, RBs) -> % function or {Mod,Fun}
+expr({call,LineNo,Func0,As0}, Bs0, Lf, Ef, RBs) -> % function or {Mod,Fun}
     {value,Func,Bs1} = expr(Func0, Bs0, Lf, Ef, none),
     {As,Bs2} = expr_list(As0, Bs1, Lf, Ef),
     case Func of
 	{M,F} when is_atom(M), is_atom(F) ->
 	    erlang:raise(error, {badfun,Func}, ?STACKTRACE);
 	_ ->
-	    do_apply(Func, As, Bs2, Ef, RBs)
+	    do_apply(Func, As, Bs2, Ef, RBs, LineNo)
     end;
 expr({'catch',_,Expr}, Bs0, Lf, Ef, RBs) ->
     try expr(Expr, Bs0, Lf, Ef, none) of
@@ -455,9 +456,9 @@ expr({match,_,Lhs,Rhs0}, Bs0, Lf, Ef, RBs) ->
             ret_expr(Rhs, Bs, RBs);
 	nomatch -> erlang:raise(error, {badmatch,Rhs}, ?STACKTRACE)
     end;
-expr({op,_,Op,A0}, Bs0, Lf, Ef, RBs) ->
+expr({op,Line,Op,A0}, Bs0, Lf, Ef, RBs) ->
     {value,A,Bs} = expr(A0, Bs0, Lf, Ef, none),
-    eval_op(Op, A, Bs, Ef, RBs);
+    eval_op(Op, A, Bs, Ef, RBs, Line);
 expr({op,_,'andalso',L0,R0}, Bs0, Lf, Ef, RBs) ->
     {value,L,Bs1} = expr(L0, Bs0, Lf, Ef, none),
     V = case L of
@@ -478,10 +479,10 @@ expr({op,_,'orelse',L0,R0}, Bs0, Lf, Ef, RBs) ->
 	    _ -> erlang:raise(error, {badarg,L}, ?STACKTRACE)
 	end,
     ret_expr(V, Bs1, RBs);
-expr({op,_,Op,L0,R0}, Bs0, Lf, Ef, RBs) ->
+expr({op,Line,Op,L0,R0}, Bs0, Lf, Ef, RBs) ->
     {value,L,Bs1} = expr(L0, Bs0, Lf, Ef, none),
     {value,R,Bs2} = expr(R0, Bs0, Lf, Ef, none),
-    eval_op(Op, L, R, merge_bindings(Bs1, Bs2), Ef, RBs);
+    eval_op(Op, L, R, merge_bindings(Bs1, Bs2), Ef, RBs, Line);
 expr({bin,_,Fs}, Bs0, Lf, Ef, RBs) ->
     EvalFun = fun(E, B) -> expr(E, B, Lf, Ef, none) end,
     % HERE HERE HERE
@@ -591,7 +592,7 @@ local_func2({value,V,Bs}, RBs) ->
 local_func2({eval,F,As,Bs}, RBs) -> % This reply is not documented.
     %% The shell found F. erl_eval tries to do a tail recursive call,
     %% something the shell cannot do. Do not use Ef here.
-    do_apply(F, As, Bs, none, RBs).
+    do_apply(F, As, Bs, none, RBs, -100).
 
 %% bif(Name, Arguments, RBs)
 %%  Evaluate the Erlang auto-imported function Name. erlang:apply/2,3
@@ -600,18 +601,18 @@ local_func2({eval,F,As,Bs}, RBs) -> % This reply is not documented.
 bif(apply, [erlang,apply,As], Bs, Ef, RBs) ->
     bif(apply, As, Bs, Ef, RBs);
 bif(apply, [M,F,As], Bs, Ef, RBs) ->
-    do_apply(M, F, As, Bs, Ef, RBs);
+    do_apply(M, F, As, Bs, Ef, RBs, -100);
 bif(apply, [F,As], Bs, Ef, RBs) ->
-    do_apply(F, As, Bs, Ef, RBs);
+    do_apply(F, As, Bs, Ef, RBs, -100);
 bif(Name, As, Bs, Ef, RBs) ->
-    do_apply(erlang, Name, As, Bs, Ef, RBs).
+    do_apply(erlang, Name, As, Bs, Ef, RBs, -100).
 
-%% do_apply(MF, Arguments, Bindings, ExternalFuncHandler, RBs) ->
+%% do_apply(MF, Arguments, Bindings, ExternalFuncHandler, RBs, Line) ->
 %%	{value,Value,Bindings} | Value when
 %%	ExternalFuncHandler = {value,F} | none.
 %% MF is a tuple {Module,Function} or a fun.
 
-do_apply({M,F}=Func, As, Bs0, Ef, RBs)
+do_apply({M,F}=Func, As, Bs0, Ef, RBs, Line)
   when tuple_size(M) >= 1, is_atom(element(1, M)), is_atom(F) ->
     case Ef of
         none when RBs =:= value ->
@@ -620,11 +621,11 @@ do_apply({M,F}=Func, As, Bs0, Ef, RBs)
         none ->
             ret_expr(apply(M, F, As), Bs0, RBs);
         {value,Fun} when RBs =:= value ->
-            Fun(Func, As);
+            Fun(Func, As, Line);
         {value,Fun} ->
-            ret_expr(Fun(Func, As), Bs0, RBs)
+            ret_expr(Fun(Func, As, Line), Bs0, RBs)
     end;
-do_apply(Func, As, Bs0, Ef, RBs) ->
+do_apply(Func, As, Bs0, Ef, RBs, Line) ->
     Env = if
               is_function(Func) -> 
                   case {erlang:fun_info(Func, module),
@@ -670,12 +671,12 @@ do_apply(Func, As, Bs0, Ef, RBs) ->
         {no_env,none} ->
             ret_expr(apply(Func, As), Bs0, RBs);
         {no_env,{value,F}} when RBs =:= value ->
-            F(Func,As);
+            F(Func, As, Line);
         {no_env,{value,F}} ->
-            ret_expr(F(Func, As), Bs0, RBs)
+            ret_expr(F(Func, As, Line), Bs0, RBs)
     end.
 
-do_apply(Mod, Func, As, Bs0, Ef, RBs) ->
+do_apply(Mod, Func, As, Bs0, Ef, RBs, Line) ->
     case Ef of
         none when RBs =:= value ->
             %% Make tail recursive calls when possible.
@@ -684,10 +685,10 @@ do_apply(Mod, Func, As, Bs0, Ef, RBs) ->
             % HERE HERE HERE
             ret_expr(apply(Mod, Func, As), Bs0, RBs);
         {value,F} when RBs =:= value ->
-            F({Mod,Func}, As);
+            F({Mod,Func}, As, Line);
         {value,F} ->
             % HERE HERE HERE
-            ret_expr(F({Mod,Func}, As), Bs0, RBs)
+            ret_expr(F({Mod,Func}, As, Line), Bs0, RBs)
     end.
 
 %% eval_lc(Expr, [Qualifier], Bindings, LocalFunctionHandler, 
@@ -896,11 +897,11 @@ expr_list([E|Es], Vs, BsOrig, Bs0, Lf, Ef) ->
 expr_list([], Vs, _, Bs, _Lf, _Ef) ->
     {reverse(Vs),Bs}.
 
-eval_op(Op, Arg1, Arg2, Bs, Ef, RBs) ->
-    do_apply(erlang, Op, [Arg1,Arg2], Bs, Ef, RBs).
+eval_op(Op, Arg1, Arg2, Bs, Ef, RBs, Line) ->
+    do_apply(erlang, Op, [Arg1,Arg2], Bs, Ef, RBs, Line).
 
-eval_op(Op, Arg, Bs, Ef, RBs) ->
-    do_apply(erlang, Op, [Arg], Bs, Ef, RBs).
+eval_op(Op, Arg, Bs, Ef, RBs, Line) ->
+    do_apply(erlang, Op, [Arg], Bs, Ef, RBs, Line).
 
 %% if_clauses(Clauses, Bindings, LocalFuncHandler, ExtFuncHandler, RBs)
 
