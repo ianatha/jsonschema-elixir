@@ -22,11 +22,11 @@ defmodule EvalSandbox.RestrictedEvaluator do
     case code do
       {:__aliases__, meta, aliases} ->
         {:__aliases__, meta, Module.concat(namespace ++ aliases)}
-      # {:., meta, callref} ->
-      #   case hd(callref) do
-      #     {:__aliases__, _, _} -> {:., meta, callref}
-      #     #a when is_atom(a) -> {:., meta, [:SANDBOX_SAGT_VERBOTEN] ++ callref}
-      #   end
+      {:., meta, callref} ->
+        case hd(callref) do
+          {:__aliases__, _, _} -> {:., meta, callref}
+          a when is_atom(a) -> {:., meta, [:SANDBOX_SAGT_VERBOTEN] ++ callref}
+        end
       _ -> code
     end
   end
