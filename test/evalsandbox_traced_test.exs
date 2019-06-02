@@ -4,12 +4,13 @@ defmodule EvalSandboxTracedTest do
   require SandboxAllowOnlyStringReverse
   require EvalSandbox.TracedEvaluator
 
- test "trace" do
-   allowed = """
-     s = String.reverse("abc")
-   """
-   EvalSandbox.TracedEvaluator.eval(allowed, SandboxAllowOnlyStringReverse)
- end
+  test "trace" do
+    allowed = """
+      s = String.reverse("abc")
+    """
+
+    EvalSandbox.TracedEvaluator.eval(allowed, SandboxAllowOnlyStringReverse)
+  end
 
   # test "trace2" do
   #   allowed = """
@@ -17,5 +18,4 @@ defmodule EvalSandboxTracedTest do
   #   """
   #   EvalSandbox.TracedEvaluator.eval(allowed, SandboxAllowOnlyStringReverse)
   # end
-
 end

@@ -6,6 +6,7 @@ defmodule Test.MixProject do
       app: :elxir_jsonschema,
       version: "0.1.0",
       elixir: "~> 1.7",
+      erlc_paths: ["lib"],
       start_permanent: Mix.env() == :prod,
       deps: deps()
     ]

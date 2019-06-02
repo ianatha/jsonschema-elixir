@@ -23,7 +23,11 @@ defmodule JSONSchemaTest do
              "$id": "#",
              properties: %{
                id: %{"$id": "#/properties/id", type: :integer},
-               type: %{"$id": "#/properties/type", enum: [:pos, :internet, :phone, :recurring], type: :string}
+               type: %{
+                 "$id": "#/properties/type",
+                 enum: [:pos, :internet, :phone, :recurring],
+                 type: :string
+               }
              },
              type: :object
            }
