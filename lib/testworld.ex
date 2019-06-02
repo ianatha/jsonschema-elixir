@@ -35,9 +35,8 @@ defmodule TestWorld do
   )
 end
 
-defmodule TestEvalSandbox do
+defmodule SandboxAllowOnlyStringReverse do
   use EvalSandbox
 
   allow(String, reverse: 1)
-  allow(IO, puts: 1)
 end

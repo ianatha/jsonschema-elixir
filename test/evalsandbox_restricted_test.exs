@@ -1,20 +1,15 @@
-defmodule EvalSandboxTest do
+defmodule EvalSandboxRestrictedTest do
   use ExUnit.Case
 
-  require TestEvalSandbox
+  require SandboxAllowOnlyStringReverse
   require EvalSandbox.RestrictedEvaluator
   require EvalSandbox.TracedEvaluator
 
  test "allowed works" do
    allowed = """
      s = String.reverse("abc")
-     if s == "cba" do
-       a = 123
-       IO.puts(a)
-     end
-     s
    """
-   assert(EvalSandbox.RestrictedEvaluator.evaluate_restricted(allowed, TestEvalSandbox) == "cba")
+   assert(EvalSandbox.RestrictedEvaluator.evaluate_restricted(allowed, SandboxAllowOnlyStringReverse) == "cba")
  end
 
  test "disallowed raises exception" do
@@ -22,7 +17,7 @@ defmodule EvalSandboxTest do
      disallowed = """
        s = String.split("a bc", " ")
      """
-     EvalSandbox.RestrictedEvaluator.evaluate_restricted(disallowed, TestEvalSandbox)
+     EvalSandbox.RestrictedEvaluator.evaluate_restricted(disallowed, SandboxAllowOnlyStringReverse)
    end
  end
 
@@ -31,7 +26,7 @@ defmodule EvalSandboxTest do
      disallowed = """
        s = :string.split("a bc", " ")
      """
-     EvalSandbox.RestrictedEvaluator.evaluate_restricted(disallowed, TestEvalSandbox)
+     EvalSandbox.RestrictedEvaluator.evaluate_restricted(disallowed, SandboxAllowOnlyStringReverse)
    end
  end
 
@@ -40,7 +35,7 @@ defmodule EvalSandboxTest do
      disallowed = """
        s = "Hello \#{System.monotonic_time()}"
      """
-     EvalSandbox.RestrictedEvaluator.evaluate_restricted(disallowed, TestEvalSandbox)
+     EvalSandbox.RestrictedEvaluator.evaluate_restricted(disallowed, SandboxAllowOnlyStringReverse)
    end
  end
 
@@ -48,6 +43,6 @@ defmodule EvalSandboxTest do
   allowed = """
       s = "Hello \#{String.reverse(\"abc\")}"
     """
-    assert(EvalSandbox.RestrictedEvaluator.evaluate_restricted(allowed, TestEvalSandbox) == "Hello cba")
+    assert(EvalSandbox.RestrictedEvaluator.evaluate_restricted(allowed, SandboxAllowOnlyStringReverse) == "Hello cba")
   end
 end

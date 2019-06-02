@@ -1,5 +1,5 @@
 defmodule EvalSandbox do
-  defmacro __using__(settings \\ []) do
+  defmacro __using__(_settings \\ []) do
     quote location: :keep, unquote: false do
       import EvalSandbox, only: [allow: 2]
     end
