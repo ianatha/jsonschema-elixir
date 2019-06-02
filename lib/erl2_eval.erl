@@ -126,8 +126,15 @@ exprs([E], Bs0, Lf, Ef, RBs) ->
 exprs([E|Es], Bs0, Lf, Ef, RBs) ->
     'Elixir.IO':inspect({exprs, [E|Es]}),
     RBs1 = none,
-    {value,_V,Bs} = expr(E, Bs0, Lf, Ef, RBs1),
-    exprs(Es, Bs, Lf, Ef, RBs).
+    {value,V,Bs} = expr(E, Bs0, Lf, Ef, RBs1),
+    case V of 
+        %%% OMG money
+        suspend -> {suspension, V, Bs, RBs};
+        % , RBs);
+        _V -> exprs(Es, Bs, Lf, Ef, RBs)
+    end.
+    % 'Elixir.IO':inspect({exprs_value, V}),
+    
 
 %% expr(Expression, Bindings)
 %% expr(Expression, Bindings, LocalFuncHandler)
@@ -412,13 +419,18 @@ expr({call,LineNo,{remote,_,Mod,Func},As0}, Bs0, Lf, Ef, RBs) ->
     % HERE HERE HERE
     {value,M,Bs1} = expr(Mod, Bs0, Lf, Ef, none),
     {value,F,Bs2} = expr(Func, Bs0, Lf, Ef, none),
-    {As,Bs3} = expr_list(As0, merge_bindings(Bs1, Bs2), Lf, Ef),
-    %% M could be a parameterized module (not an atom).
-    case is_atom(M) andalso erl_internal:bif(M, F, length(As)) of
-        true ->
-            bif(F, As, Bs3, Ef, RBs);
-        false ->
-            do_apply(M, F, As, Bs3, Ef, RBs, LineNo)
+    case expr_list(As0, merge_bindings(Bs1, Bs2), Lf, Ef) of
+        {As, Bs3} ->
+            %% M could be a parameterized module (not an atom).
+            case is_atom(M) andalso erl_internal:bif(M, F, length(As)) of
+                true ->
+                    bif(F, As, Bs3, Ef, RBs);
+                false ->
+                    do_apply(M, F, As, Bs3, Ef, RBs, LineNo)
+            end;
+        {suspension,XV,XA,XB} -> 
+            'Elixir.IO':inspect({suspension_expr_list, XV, XA, XB}),
+            {suspension, XV,XA,XB}
     end;
 expr({call,_,{atom,_,Func},As0}, Bs0, Lf, Ef, RBs) ->
     case erl_internal:bif(Func, length(As0)) of
@@ -892,8 +904,16 @@ expr_list(Es, Bs, Lf, Ef) ->
     expr_list(Es, [], Bs, Bs, Lf, Ef).    
 
 expr_list([E|Es], Vs, BsOrig, Bs0, Lf, Ef) ->
+    'Elixir.IO':inspect({expr_list, [E|Es]}),
     {value,V,Bs1} = expr(E, BsOrig, Lf, Ef, none),
-    expr_list(Es, [V|Vs], BsOrig, merge_bindings(Bs1, Bs0), Lf, Ef);
+    case V of 
+        %%% OMG money
+        suspend -> {suspension, V, BsOrig, Bs1};
+        % , RBs);
+        _V -> expr_list(Es, [V|Vs], BsOrig, merge_bindings(Bs1, Bs0), Lf, Ef)
+    end;
+    % 'Elixir.IO':inspect({exprs_value, V}),
+    
 expr_list([], Vs, _, Bs, _Lf, _Ef) ->
     {reverse(Vs),Bs}.
 
