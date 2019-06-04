@@ -17,7 +17,7 @@
 %% 
 %% %CopyrightEnd%
 %%
--module(erl2_eval).
+-module(simple_erl2_eval).
 
 %% Guard is_map/1 is not yet supported in HiPE.
 -compile(no_native).
@@ -46,7 +46,8 @@
 
 % -export_type([binding_struct/0]).
 
--type(evaldexpressionstatus()) :: uneval.
+-type(evaldexpressionstatus()) :: {evald, term()}
+                                | uneval.
 -type(evaldexpression()) :: {expression(), evaldexpressionstatus()}.
 -type(expression() :: erl_parse:abstract_expr()).
 -type(expressions() :: [erl_parse:abstract_expr()]).
@@ -132,12 +133,8 @@ exprs([E], Bs0, Lf, Ef, RBs) ->
 exprs([E|Es], Bs0, Lf, Ef, RBs) ->
     % 'Elixir.IO':inspect({exprs, [E|Es]}),
     RBs1 = none,
-    {value,V,Bs} = expr(E, Bs0, Lf, Ef, RBs1),
-    case V of 
-        %%% OMG money
-        _V -> exprs(Es, Bs, Lf, Ef, RBs)
-    end.
-    % 'Elixir.IO':inspect({exprs_value, V}),
+    {value,_V,Bs,E} = expr(E, Bs0, Lf, Ef, RBs1),
+    exprs(Es, Bs, Lf, Ef, RBs).
     
 
 %% expr(Expression, Bindings)
@@ -226,46 +223,50 @@ translate({Atom, Number, Arg1, Arg2}) ->
 translate(Datum) when is_tuple(Datum) ->
     {Datum, uneval}.
 
--spec(expr(Expression, Bindings, LocalFunctionHandler,
+-spec(expr(EvaldExpression, Bindings, LocalFunctionHandler,
            NonLocalFunctionHandler, ReturnFormat) ->
              {value, Value, NewBindings} | Value when
-      Expression :: expression(),
+      EvaldExpression :: evaldexpression(),
       Bindings :: binding_struct(),
       LocalFunctionHandler :: local_function_handler(),
       NonLocalFunctionHandler :: non_local_function_handler(),
       ReturnFormat :: none | value,
       Value :: value(),
       NewBindings :: binding_struct()).
-expr({var,_,V}, Bs, _Lf, _Ef, RBs) ->
+
+expr({var,_,V}=Expr, Bs, _Lf, _Ef, RBs) ->
     case binding(V, Bs) of
 	{value,Val} ->
-            ret_expr(Val, Bs, RBs);
+            ret_expr(Val, Bs, RBs, Expr);
 	unbound -> % Cannot not happen if checked by erl_lint
 	    erlang:raise(error, {unbound,V}, ?STACKTRACE)
     end;
-expr({char,_,C}, Bs, _Lf, _Ef, RBs) ->
-    ret_expr(C, Bs, RBs);
-expr({integer,_,I}, Bs, _Lf, _Ef, RBs) ->
-    ret_expr(I, Bs, RBs);
-% expr({float,_,F}, Bs, _Lf, _Ef, RBs) ->
-%     ret_expr(F, Bs, RBs);
-expr({atom,_,A}, Bs, _Lf, _Ef, RBs) ->
-    ret_expr(A, Bs, RBs);
-% expr({string,_,S}, Bs, _Lf, _Ef, RBs) ->
-%     ret_expr(S, Bs, RBs);
-expr({nil, _}, Bs, _Lf, _Ef, RBs) ->
-    ret_expr([], Bs, RBs);
-expr({cons,_,H0,T0}, Bs0, Lf, Ef, RBs) ->
+
+% Literal Expressions
+expr({char,_,C}=Expr, Bs, _Lf, _Ef, RBs) ->
+    ret_expr(C, Bs, RBs, Expr);
+expr({integer,_,I}=Expr, Bs, _Lf, _Ef, RBs) ->
+    ret_expr(I, Bs, RBs, Expr);
+expr({float,_,F}=Expr, Bs, _Lf, _Ef, RBs) ->
+    ret_expr(F, Bs, RBs, Expr);
+expr({atom,_,A}=Expr, Bs, _Lf, _Ef, RBs) ->
+    ret_expr(A, Bs, RBs, Expr);
+expr({string,_,S}=Expr, Bs, _Lf, _Ef, RBs) ->
+    ret_expr(S, Bs, RBs, Expr);
+expr({nil, _}=Expr, Bs, _Lf, _Ef, RBs) ->
+    ret_expr([], Bs, RBs, Expr);
+
+expr({cons,_,H0,T0}=Expr, Bs0, Lf, Ef, RBs) ->
     {value,H,Bs1} = expr(H0, Bs0, Lf, Ef, none),
     {value,T,Bs2} = expr(T0, Bs0, Lf, Ef, none),
-    ret_expr([H|T], merge_bindings(Bs1, Bs2), RBs);
+    ret_expr([H|T], merge_bindings(Bs1, Bs2), RBs, Expr);
 % expr({lc,_,E,Qs}, Bs, Lf, Ef, RBs) ->
 %     eval_lc(E, Qs, Bs, Lf, Ef, RBs);
 % expr({bc,_,E,Qs}, Bs, Lf, Ef, RBs) ->
 %     eval_bc(E, Qs, Bs, Lf, Ef, RBs);
-expr({tuple,_,Es}, Bs0, Lf, Ef, RBs) ->
+expr({tuple,_,Es}=Expr, Bs0, Lf, Ef, RBs) ->
     {Vs,Bs} = expr_list(Es, Bs0, Lf, Ef),
-    ret_expr(list_to_tuple(Vs), Bs, RBs);
+    ret_expr(list_to_tuple(Vs), Bs, RBs, Expr);
 % expr({record_field,_,_,Name,_}, _Bs, _Lf, _Ef, _RBs) ->
 %     erlang:raise(error, {undef_record,Name}, ?STACKTRACE);
 % expr({record_index,_,Name,_}, _Bs, _Lf, _Ef, _RBs) ->
@@ -478,11 +479,11 @@ expr({block,_,Es}, Bs, Lf, Ef, RBs) ->
 %         error:Reason:Stacktrace ->
 %             ret_expr({'EXIT',{Reason,Stacktrace}}, Bs0, RBs)
 %     end;
-expr({match,_,Lhs,Rhs0}, Bs0, Lf, Ef, RBs) ->
-    {value,Rhs,Bs1} = expr(Rhs0, Bs0, Lf, Ef, none),
+expr({match,_,Lhs,Rhs0} = Expr, Bs0, Lf, Ef, RBs) ->
+    {value,Rhs,Bs1,Expr0} = expr(Rhs0, Bs0, Lf, Ef, none),
     case match(Lhs, Rhs, Bs1) of
 	{match,Bs} ->
-            ret_expr(Rhs, Bs, RBs);
+            ret_expr(Rhs, Bs, RBs, Expr0);
 	nomatch -> erlang:raise(error, {badmatch,Rhs}, ?STACKTRACE)
     end;
 % expr({op,Line,Op,A0}, Bs0, Lf, Ef, RBs) ->
@@ -508,10 +509,10 @@ expr({match,_,Lhs,Rhs0}, Bs0, Lf, Ef, RBs) ->
 % 	    _ -> erlang:raise(error, {badarg,L}, ?STACKTRACE)
 % 	end,
 %     ret_expr(V, Bs1, RBs);
-expr({op,Line,Op,L0,R0}, Bs0, Lf, Ef, RBs) ->
-    {value,L,Bs1} = expr(L0, Bs0, Lf, Ef, none),
-    {value,R,Bs2} = expr(R0, Bs0, Lf, Ef, none),
-    eval_op(Op, L, R, merge_bindings(Bs1, Bs2), Ef, RBs, Line);
+expr({op,Line,Op,L0,R0} = E, Bs0, Lf, Ef, RBs) ->
+    {value,L,Bs1,LE} = expr(L0, Bs0, Lf, Ef, none),
+    {value,R,Bs2,RE} = expr(R0, Bs0, Lf, Ef, none),
+    eval_op(Op, L, R, merge_bindings(Bs1, Bs2), Ef, RBs, {{op,Line,Op,L0,R0}});
 % expr({bin,_,Fs}, Bs0, Lf, Ef, RBs) ->
 %     EvalFun = fun(E, B) -> expr(E, B, Lf, Ef, none) end,
 %     % HERE HERE HERE
@@ -522,8 +523,8 @@ expr({op,Line,Op,L0,R0}, Bs0, Lf, Ef, RBs) ->
 %     end;
 % expr({remote,_,_,_}, _Bs, _Lf, _Ef, _RBs) ->
 %     erlang:raise(error, {badexpr,':'}, ?STACKTRACE);
-expr({value,_,Val}, Bs, _Lf, _Ef, RBs) ->    % Special case straight values.
-    ret_expr(Val, Bs, RBs).
+expr({value,_,Val} = Expr, Bs, _Lf, _Ef, RBs) ->    % Special case straight values.
+    ret_expr(Val, Bs, RBs, Expr).
 % expr({suspension,_,Val,Cool}, Bs, _Lf, _Ef, RBs) ->    % Special case straight values.
 %     'Elixir.IO':inspect({suspension123123123, Val}),
 %     ret_expr(Val, Bs, RBs).
@@ -604,7 +605,7 @@ local_func(Func, As0, Bs0, {value,F}, Ef, value) ->
     F(Func, As1);
 local_func(Func, As0, Bs0, {value,F}, Ef, RBs) ->
     {As1,Bs1} = expr_list(As0, Bs0, {value,F}, Ef),
-    ret_expr(F(Func, As1), Bs1, RBs);
+    ret_expr(F(Func, As1), Bs1, RBs, todo1);
 local_func(Func, As0, Bs0, {value,F,Eas}, Ef, RBs) ->
     Fun = fun(Name, Args) -> apply(F, [Name,Args|Eas]) end,
     local_func(Func, As0, Bs0, {value, Fun}, Ef, RBs);
@@ -615,7 +616,7 @@ local_func(Func, As, Bs, {eval,F,Eas}, _Ef, RBs) ->
 %% These two clauses are for backwards compatibility.
 local_func(Func, As0, Bs0, {M,F}, Ef, RBs) ->
     {As1,Bs1} = expr_list(As0, Bs0, {M,F}, Ef),
-    ret_expr(M:F(Func,As1), Bs1, RBs);
+    ret_expr(M:F(Func,As1), Bs1, RBs, todo2);
 local_func(Func, As, _Bs, {M,F,Eas}, _Ef, RBs) ->
     local_func2(apply(M, F, [Func,As|Eas]), RBs);
 %% Default unknown function handler to undefined function.
@@ -623,7 +624,7 @@ local_func(Func, As0, _Bs0, none, _Ef, _RBs) ->
     erlang:raise(error, undef, [{?MODULE,Func,length(As0)}|?STACKTRACE]).
 
 local_func2({value,V,Bs}, RBs) ->
-    ret_expr(V, Bs, RBs);
+    ret_expr(V, Bs, RBs, todo3);
 local_func2({eval,F,As,Bs}, RBs) -> % This reply is not documented.
     %% The shell found F. erl_eval tries to do a tail recursive call,
     %% something the shell cannot do. Do not use Ef here.
@@ -654,11 +655,11 @@ do_apply({M,F}=Func, As, Bs0, Ef, RBs, Line)
             %% Make tail recursive calls when possible.
             apply(M, F, As);
         none ->
-            ret_expr(apply(M, F, As), Bs0, RBs);
+            ret_expr(apply(M, F, As), Bs0, RBs, todo4);
         {value,Fun} when RBs =:= value ->
             Fun(Func, As, Line);
         {value,Fun} ->
-            ret_expr(Fun(Func, As, Line), Bs0, RBs)
+            ret_expr(Fun(Func, As, Line), Bs0, RBs, todo5)
     end;
 do_apply(Func, As, Bs0, Ef, RBs, Line) ->
     Env = if
@@ -704,26 +705,26 @@ do_apply(Func, As, Bs0, Ef, RBs, Line) ->
             %% Make tail recursive calls when possible.
             apply(Func, As);
         {no_env,none} ->
-            ret_expr(apply(Func, As), Bs0, RBs);
+            ret_expr(apply(Func, As), Bs0, RBs, todo6);
         {no_env,{value,F}} when RBs =:= value ->
             F(Func, As, Line);
         {no_env,{value,F}} ->
-            ret_expr(F(Func, As, Line), Bs0, RBs)
+            ret_expr(F(Func, As, Line), Bs0, RBs, todo7)
     end.
 
-do_apply(Mod, Func, As, Bs0, Ef, RBs, Line) ->
+do_apply(Mod, Func, As, Bs0, Ef, RBs, Expr) when is_tuple(Expr) ->
     case Ef of
         none when RBs =:= value ->
             %% Make tail recursive calls when possible.
             apply(Mod, Func, As);
         none ->
             % HERE HERE HERE
-            ret_expr(apply(Mod, Func, As), Bs0, RBs);
+            ret_expr(apply(Mod, Func, As), Bs0, RBs, Expr);
         {value,F} when RBs =:= value ->
-            F({Mod,Func}, As, Line);
+            F({Mod,Func}, As, -100);
         {value,F} ->
             % HERE HERE HERE
-            ret_expr(F({Mod,Func}, As, Line), Bs0, RBs)
+            ret_expr(F({Mod,Func}, As, -100), Bs0, RBs, Expr)
     end.
 
 %% eval_lc(Expr, [Qualifier], Bindings, LocalFunctionHandler, 
@@ -840,12 +841,12 @@ eval_b_generate(Term, _P, _Bs0, _Lf, _Ef, _CompFun, _Acc) ->
 %% outside a function. If RBs =:= value, only the value (not the bindings)
 %% is to be returned (to a compiled function).
 
-ret_expr(V, _Bs, value) ->
+ret_expr(V, _Bs, value, Expr) ->
     V;
-ret_expr(V, Bs, none) ->
-    {value,V,Bs};
-ret_expr(V, _Bs, RBs) when is_list(RBs) ->
-    {value,V,RBs}.
+ret_expr(V, Bs, none, Expr) ->
+    {value,V,Bs,Expr};
+ret_expr(V, _Bs, RBs,Expr) when is_list(RBs) ->
+    {value,V,RBs,Expr}.
 
 %% eval_fun(Arguments, {Bindings,LocalFunctionHandler,
 %%                      ExternalFunctionHandler,Clauses}) -> Value
@@ -942,11 +943,11 @@ expr_list([E|Es], Vs, BsOrig, Bs0, Lf, Ef) ->
 expr_list([], Vs, _, Bs, _Lf, _Ef) ->
     {reverse(Vs),Bs}.
 
-eval_op(Op, Arg1, Arg2, Bs, Ef, RBs, Line) ->
-    do_apply(erlang, Op, [Arg1,Arg2], Bs, Ef, RBs, Line).
+eval_op(Op, Arg1, Arg2, Bs, Ef, RBs, Expr) ->
+    do_apply(erlang, Op, [Arg1,Arg2], Bs, Ef, RBs, Expr).
 
-eval_op(Op, Arg, Bs, Ef, RBs, Line) ->
-    do_apply(erlang, Op, [Arg], Bs, Ef, RBs, Line).
+eval_op(Op, Arg, Bs, Ef, RBs, Expr) ->
+    do_apply(erlang, Op, [Arg], Bs, Ef, RBs, Expr).
 
 %% if_clauses(Clauses, Bindings, LocalFuncHandler, ExtFuncHandler, RBs)
 
@@ -961,36 +962,36 @@ if_clauses([], _Bs, _Lf, _Ef, _RBs) ->
 %% try_clauses(Body, CaseClauses, CatchClauses, AfterBody, Bindings, 
 %%             LocalFuncHandler, ExtFuncHandler, RBs)
 
-try_clauses(B, Cases, Catches, AB, Bs, Lf, Ef, RBs) ->
-    check_stacktrace_vars(Catches, Bs),
-    try exprs(B, Bs, Lf, Ef, none) of
-	{value,V,Bs1} when Cases =:= [] ->
-	    ret_expr(V, Bs1, RBs);
-	{value,V,Bs1} ->
-	    case match_clause(Cases, [V], Bs1, Lf, Ef) of
-		{B2,Bs2} ->
-		    exprs(B2, Bs2, Lf, Ef, RBs);
-		nomatch ->
-		    erlang:raise(error, {try_clause,V}, ?STACKTRACE)
-	    end
-    catch
-	Class:Reason:Stacktrace when Catches =:= [] ->
-	    erlang:raise(Class, Reason, Stacktrace);
-	Class:Reason:Stacktrace ->
-            V = {Class,Reason,Stacktrace},
-	    case match_clause(Catches, [V], Bs, Lf, Ef) of
-		{B2,Bs2} ->
-		    exprs(B2, Bs2, Lf, Ef, RBs);
-		nomatch ->
-		    erlang:raise(Class, Reason, Stacktrace)
-	    end
-    after
-	if AB =:= [] -> 
-		Bs; % any
-	   true ->
-		exprs(AB, Bs, Lf, Ef, none)
-	end
-    end.
+% try_clauses(B, Cases, Catches, AB, Bs, Lf, Ef, RBs) ->
+%     check_stacktrace_vars(Catches, Bs),
+%     try exprs(B, Bs, Lf, Ef, none) of
+% 	{value,V,Bs1} when Cases =:= [] ->
+% 	    ret_expr(V, Bs1, RBs);
+% 	{value,V,Bs1} ->
+% 	    case match_clause(Cases, [V], Bs1, Lf, Ef) of
+% 		{B2,Bs2} ->
+% 		    exprs(B2, Bs2, Lf, Ef, RBs);
+% 		nomatch ->
+% 		    erlang:raise(error, {try_clause,V}, ?STACKTRACE)
+% 	    end
+%     catch
+% 	Class:Reason:Stacktrace when Catches =:= [] ->
+% 	    erlang:raise(Class, Reason, Stacktrace);
+% 	Class:Reason:Stacktrace ->
+%             V = {Class,Reason,Stacktrace},
+% 	    case match_clause(Catches, [V], Bs, Lf, Ef) of
+% 		{B2,Bs2} ->
+% 		    exprs(B2, Bs2, Lf, Ef, RBs);
+% 		nomatch ->
+% 		    erlang:raise(Class, Reason, Stacktrace)
+% 	    end
+%     after
+% 	if AB =:= [] -> 
+% 		Bs; % any
+% 	   true ->
+% 		exprs(AB, Bs, Lf, Ef, none)
+% 	end
+%     end.
 
 check_stacktrace_vars([{clause,_,[{tuple,_,[_,_,STV]}],_,_}|Cs], Bs) ->
     case STV of
