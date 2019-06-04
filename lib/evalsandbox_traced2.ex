@@ -37,12 +37,41 @@ defmodule EvalSandbox.Traced2Evaluator do
   end
 
   def nlfh(buffer, {module, func}, args) do
-    result = :erlang.apply(module, func, args)
-    Agent.update(buffer, fn acc -> acc ++ [{:fn, module, func, args, result}] end)
+    cache_result =
+      Agent.get(buffer, fn acc ->
+        case Enum.at(Keyword.get(acc, :transcript), Keyword.get(acc, :i)) do
+          {:fn, ^module, ^func, ^args, result} -> {:from_cache, result}
+          nil -> {:none}
+          _ -> raise ArgumentError, message: "invalid transcript - entry doesn't match call"
+        end
+      end)
+
+    result =
+      case cache_result do
+        {:from_cache, result} ->
+          Agent.update(buffer, fn acc ->
+            acc
+            |> Keyword.update!(:i, fn i -> i + 1 end)
+          end)
+
+          result
+
+        {:none} ->
+          result = :erlang.apply(module, func, args)
+
+          Agent.update(buffer, fn acc ->
+            acc
+            |> Keyword.update!(:i, fn i -> i + 1 end)
+            |> Keyword.update!(:transcript, fn t -> t ++ [{:fn, module, func, args, result}] end)
+          end)
+
+          result
+      end
+
     result
   end
 
-  def eval_quoted(cquoted) do
+  def eval_quoted(cquoted, transcript \\ []) do
     env = :elixir.env_for_eval([])
     scope = :elixir_env.env_to_scope(env)
     binding = []
@@ -50,22 +79,23 @@ defmodule EvalSandbox.Traced2Evaluator do
     {parsed_binding, parsed_vars, _parsed_scope} = :elixir_erl_var.load_binding(binding, scope)
     parsed_env = :elixir_env.with_vars(env, parsed_vars)
     {erl, _new_env, new_scope} = :elixir.quoted_to_erl(linified_quoted, parsed_env)
-    {:ok, buffer} = Agent.start_link(fn -> [] end)
+    {:ok, buffer} = Agent.start_link(fn -> [i: 0, transcript: transcript] end)
+
     case erl do
       {:atom, _, atom} ->
-        {atom, binding, []}
+        {:value, atom, binding, []}
 
       _ ->
-        {:value, value, new_binding} =
-              :erl_eval.expr(
-                erl,
-                parsed_binding,
-                :none,
-                {:value, nlfh(buffer)},
-                :none
-              )
+        try do
+          {:value, value, new_binding} =
+            :erl_eval.expr(erl, parsed_binding, :none, {:value, nlfh(buffer)}, :none)
 
-              {value, :elixir_erl_var.dump_binding(new_binding, new_scope), Agent.get(buffer, fn data -> data end)}
+          {:value, value, :elixir_erl_var.dump_binding(new_binding, new_scope),
+           Keyword.get(Agent.get(buffer, fn data -> data end), :transcript)}
+        catch
+          :__suspend__ ->
+            {:suspension, Keyword.get(Agent.get(buffer, fn data -> data end), :transcript)}
+        end
     end
   end
 end
