@@ -106,10 +106,15 @@ defmodule EvalSandboxTraced2Test do
              {:fn, EvalSandboxTraced2Test, :suspending_function, [], 55}
            ]
 
-    {:value, value, _bindings, transcript2} =
+    {:value, value, bindings, transcript2} =
       eval_quoted(string_to_quoted!(code), [], enriched_task_status)
 
     assert value == 60
+
+    assert bindings == [
+      x: 5,
+      y: 55
+    ]
 
     assert transcript2 == [
              {:fn, :erlang, :+, [2, 3], 5},
