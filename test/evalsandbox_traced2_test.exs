@@ -25,4 +25,19 @@ defmodule EvalSandboxTraced2Test do
     assert bindings == []
     assert transcript == [ {:fn, String, :reverse, ["hello"], "olleh"} ]
   end
+
+  test "branching logic" do
+    code = """
+      if 2 + 3 > 2 do
+        String.reverse("orez")
+      else
+        String.reverse("number")
+      end
+    """
+    {value, bindings, transcript} = eval_quoted(string_to_quoted!(code))
+
+    assert value == "zero"
+    assert bindings == []
+    assert transcript == [{:fn, :erlang, :+, [2, 3], 5}, {:fn, :erlang, :>, [5, 2], true}, {:fn, String, :reverse, ["orez"], "zero"}]
+  end
 end
