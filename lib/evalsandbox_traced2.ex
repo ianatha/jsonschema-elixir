@@ -71,8 +71,7 @@ defmodule EvalSandbox.Traced2Evaluator do
             :__suspend__ ->
               Agent.update(buffer, fn acc ->
                 acc
-                |> KW.update!(:transcript, fn t -> t ++ [{:fn_suspended, module, func, args}]
-                end)
+                |> KW.update!(:transcript, fn t -> t ++ [{:fn_suspended, module, func, args}] end)
               end)
 
               throw(:__suspend__)
@@ -85,18 +84,29 @@ defmodule EvalSandbox.Traced2Evaluator do
   end
 
   def enrich_with_result([], _), do: []
-  def enrich_with_result([h|t], res), do: [enrich_with_result(h, res)] ++ enrich_with_result(t, res)
+
+  def enrich_with_result([h | t], res),
+    do: [enrich_with_result(h, res)] ++ enrich_with_result(t, res)
+
   def enrich_with_result({:fn_suspended, mod, fun, args}, res), do: {:fn, mod, fun, args, res}
   def enrich_with_result({:fn, _, _, _, _} = o, _), do: o
 
-  def eval_quoted(cquoted, transcript \\ []) do
+  @doc """
+  Converts an Elixir quoted expression to Erlang abstract format
+  """
+  def quoted_to_erl(quoted, env, scope) do
+    {expanded, new_env} = :elixir_expand.expand(quoted, env)
+    {erl, new_scope} = :elixir_erl_pass.translate(expanded, scope)
+    {erl, new_env, new_scope}
+  end
+
+  def eval_quoted(quoted, binding \\ [], transcript \\ []) do
     env = :elixir.env_for_eval([])
     scope = :elixir_env.env_to_scope(env)
-    binding = []
-    linified_quoted = :elixir_quote.linify_with_context_counter(10, :line, cquoted)
-    {parsed_binding, parsed_vars, _parsed_scope} = :elixir_erl_var.load_binding(binding, scope)
+
+    {parsed_binding, parsed_vars, parsed_scope} = :elixir_erl_var.load_binding(binding, scope)
     parsed_env = :elixir_env.with_vars(env, parsed_vars)
-    {erl, _new_env, new_scope} = :elixir.quoted_to_erl(linified_quoted, parsed_env)
+    {erl, _new_env, new_scope} = quoted_to_erl(quoted, parsed_env, parsed_scope)
     {:ok, buffer} = Agent.start_link(fn -> [i: 0, transcript: transcript] end)
 
     res =
