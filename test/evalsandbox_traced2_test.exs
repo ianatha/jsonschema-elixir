@@ -78,48 +78,45 @@ defmodule EvalSandboxTraced2Test do
 
   test "result cache used" do
     {:value, value, bindings, transcript} =
-      eval_quoted(string_to_quoted!("2+3"), [], [{:fn, :erlang, :+, [2, 3], 10}])
+      eval_quoted(string_to_quoted!("2+3"), [], [{:fn, :erlang, :+, [2, 3], 1000}])
 
-    assert value == 10
+    assert value == 1000
     assert bindings == []
-    assert transcript == [{:fn, :erlang, :+, [2, 3], 10}]
+    assert transcript == [{:fn, :erlang, :+, [2, 3], 1000}]
   end
 
   test "resurrecting suspended task" do
     code = """
-      x = 2 + 3
+      x = 1
       y = EvalSandboxTraced2Test.suspending_function()
-      x + y
+      z = EvalSandboxTraced2Test.suspending_function()
+      x + y + z
     """
 
     {:suspension, transcript1} = eval_quoted(string_to_quoted!(code), [])
 
-    assert transcript1 == [
-             {:fn, :erlang, :+, [2, 3], 5},
-             {:fn_suspended, EvalSandboxTraced2Test, :suspending_function, []}
-           ]
+    enriched_task_status1 = enrich_with_result(transcript1, 10)
 
-    enriched_task_status = enrich_with_result(transcript1, 55)
+    {:suspension, transcript2} = eval_quoted(string_to_quoted!(code), [], enriched_task_status1)
 
-    assert enriched_task_status == [
-             {:fn, :erlang, :+, [2, 3], 5},
-             {:fn, EvalSandboxTraced2Test, :suspending_function, [], 55}
-           ]
+    enriched_task_status2 = enrich_with_result(transcript2, 100)
 
-    {:value, value, bindings, transcript2} =
-      eval_quoted(string_to_quoted!(code), [], enriched_task_status)
+    {:value, value, bindings, transcript3} =
+      eval_quoted(string_to_quoted!(code), [], enriched_task_status2)
 
-    assert value == 60
+    assert value == 111
 
     assert bindings == [
-      x: 5,
-      y: 55
-    ]
+             x: 1,
+             y: 10,
+             z: 100
+           ]
 
-    assert transcript2 == [
-             {:fn, :erlang, :+, [2, 3], 5},
-             {:fn, EvalSandboxTraced2Test, :suspending_function, [], 55},
-             {:fn, :erlang, :+, [5, 55], 60}
+    assert transcript3 == [
+             {:fn, EvalSandboxTraced2Test, :suspending_function, [], 10},
+             {:fn, EvalSandboxTraced2Test, :suspending_function, [], 100},
+             {:fn, :erlang, :+, [1, 10], 11},
+             {:fn, :erlang, :+, [11, 100], 111}
            ]
   end
 end
