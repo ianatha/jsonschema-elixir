@@ -23,6 +23,7 @@ defmodule Test.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+        {:slack, "~> 0.18.0"},
       {:mix_test_watch, "~> 0.8", only: :dev, runtime: false},
       {:tap, "~> 0.1.5"},
       {:plug_cowboy, "~> 2.0"},
