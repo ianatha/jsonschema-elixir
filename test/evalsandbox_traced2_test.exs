@@ -1,19 +1,25 @@
 defmodule EvalSandboxTraced2Test do
   use ExUnit.Case
 
-  import Code, only: [string_to_quoted!: 1]
-
   import EvalSandbox.Traced2Evaluator,
-    only: [enrich_with_result: 2, eval_quoted: 1, eval_quoted: 2, eval_quoted: 3]
+    only: [
+      enrich_with_result: 2,
+      eval: 1,
+      eval: 2,
+      eval: 3,
+      eval_quoted: 1,
+      eval_quoted: 2,
+      eval_quoted: 3
+    ]
 
   test "simple addition" do
-    {:value, value, bindings, _transcript} = eval_quoted(string_to_quoted!("2+3"))
+    {:value, value, bindings, _transcript} = eval("2+3")
     assert value == 5
     assert bindings == []
   end
 
   test "binding deref" do
-    {:value, value, bindings, transcript} = eval_quoted(string_to_quoted!("x"), x: 5)
+    {:value, value, bindings, transcript} = eval("x", x: 5)
 
     assert value == 5
     assert bindings == [x: 5]
@@ -21,17 +27,29 @@ defmodule EvalSandboxTraced2Test do
   end
 
   test "simple addition with variables" do
-    {:value, value, bindings, transcript} =
-      eval_quoted(string_to_quoted!("x = 2\na = x + 3 + b"), b: 0)
+    {:value, value, bindings, transcript} = eval("x = 2\na = x + 3 + b", b: 0)
 
     assert value == 5
     assert bindings == [a: 5, b: 0, x: 2]
     assert transcript == [{:fn, :erlang, :+, [2, 3], 5}, {:fn, :erlang, :+, [5, 0], 5}]
   end
 
+  test "simple addition with variables with quoted code" do
+    code =
+      quote do
+        x = 2
+        a = x + 3 + var!(b)
+      end
+
+    {:value, value, bindings, transcript} = eval_quoted(code, b: 0)
+
+    assert value == 5
+    assert bindings == [{:b, 0}, {{:a, EvalSandboxTraced2Test}, 5}, {{:x, EvalSandboxTraced2Test}, 2}]
+    assert transcript == [{:fn, :erlang, :+, [2, 3], 5}, {:fn, :erlang, :+, [5, 0], 5}]
+  end
+
   test "string reversion and concatenation" do
-    {:value, value, bindings, transcript} =
-      eval_quoted(string_to_quoted!("String.reverse(\"hello\") <> \" world\""))
+    {:value, value, bindings, transcript} = eval("String.reverse(\"hello\") <> \" world\"")
 
     assert value == "olleh world"
     assert bindings == []
@@ -47,7 +65,7 @@ defmodule EvalSandboxTraced2Test do
       end
     """
 
-    {:value, value, bindings, transcript} = eval_quoted(string_to_quoted!(code))
+    {:value, value, bindings, transcript} = eval(code)
 
     assert value == "zero"
     assert bindings == []
@@ -73,12 +91,11 @@ defmodule EvalSandboxTraced2Test do
      [
        {:fn, :erlang, :+, [2, 3], 5},
        {:fn_suspended, EvalSandboxTraced2Test, :suspending_function, []}
-     ]} = eval_quoted(string_to_quoted!(code))
+     ]} = eval(code)
   end
 
   test "result cache used" do
-    {:value, value, bindings, transcript} =
-      eval_quoted(string_to_quoted!("2+3"), [], [{:fn, :erlang, :+, [2, 3], 1000}])
+    {:value, value, bindings, transcript} = eval("2+3", [], [{:fn, :erlang, :+, [2, 3], 1000}])
 
     assert value == 1000
     assert bindings == []
@@ -93,16 +110,15 @@ defmodule EvalSandboxTraced2Test do
       x + y + z
     """
 
-    {:suspension, transcript1} = eval_quoted(string_to_quoted!(code), [])
+    {:suspension, transcript1} = eval(code, [])
 
     enriched_task_status1 = enrich_with_result(transcript1, 10)
 
-    {:suspension, transcript2} = eval_quoted(string_to_quoted!(code), [], enriched_task_status1)
+    {:suspension, transcript2} = eval(code, [], enriched_task_status1)
 
     enriched_task_status2 = enrich_with_result(transcript2, 100)
 
-    {:value, value, bindings, transcript3} =
-      eval_quoted(string_to_quoted!(code), [], enriched_task_status2)
+    {:value, value, bindings, transcript3} = eval(code, [], enriched_task_status2)
 
     assert value == 111
 

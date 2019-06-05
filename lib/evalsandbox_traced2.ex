@@ -1,5 +1,6 @@
 defmodule EvalSandbox.Traced2Evaluator do
   require Keyword, as: KW
+  import Code, only: [string_to_quoted!: 1]
 
   defguard is_literal(x)
            when is_atom(x) or is_binary(x) or is_bitstring(x) or is_boolean(x) or is_number(x) or
@@ -26,20 +27,16 @@ defmodule EvalSandbox.Traced2Evaluator do
     Macro.postwalk(code, 0, &instrument/2)
   end
 
-  defp nlfh(buffer), do: &nlfh(buffer, &1, &2)
-
-  defp nlfh(_buffer, {:erlang, :monotonic_time}, [], _) do
-    0
-  end
+  defp function_call(buffer), do: &function_call(buffer, &1, &2)
 
   defmodule MyAppError do
     defexception [:message]
   end
 
-  defp nlfh(buffer, {module, func}, args) do
+  defp function_call(buffer, {module, func}, args) do
     cache_result =
-      Agent.get(buffer, fn acc ->
-        case Enum.at(Keyword.get(acc, :transcript), Keyword.get(acc, :i)) do
+      buffer |> Agent.get(fn acc ->
+        case Enum.at(acc |> KW.get(:transcript), acc |> KW.get(:i)) do
           {:fn, ^module, ^func, ^args, result} -> {:from_cache, result}
           nil -> {:none}
           _ -> raise ArgumentError, message: "invalid transcript - entry doesn't match call"
@@ -49,7 +46,7 @@ defmodule EvalSandbox.Traced2Evaluator do
     result =
       case cache_result do
         {:from_cache, result} ->
-          Agent.update(buffer, fn acc ->
+          buffer |> Agent.update(fn acc ->
             acc
             |> KW.update!(:i, fn i -> i + 1 end)
           end)
@@ -60,7 +57,7 @@ defmodule EvalSandbox.Traced2Evaluator do
           try do
             result = :erlang.apply(module, func, args)
 
-            Agent.update(buffer, fn acc ->
+            buffer |> Agent.update(fn acc ->
               acc
               |> KW.update!(:i, fn i -> i + 1 end)
               |> KW.update!(:transcript, fn t -> t ++ [{:fn, module, func, args, result}] end)
@@ -69,7 +66,7 @@ defmodule EvalSandbox.Traced2Evaluator do
             result
           catch
             :__suspend__ ->
-              Agent.update(buffer, fn acc ->
+              buffer |> Agent.update(fn acc ->
                 acc
                 |> KW.update!(:transcript, fn t -> t ++ [{:fn_suspended, module, func, args}] end)
               end)
@@ -95,18 +92,26 @@ defmodule EvalSandbox.Traced2Evaluator do
   Converts an Elixir quoted expression to Erlang abstract format
   """
   def quoted_to_erl(quoted, env, scope) do
-    {expanded, new_env} = :elixir_expand.expand(quoted, env)
+    {expanded, new_env} = quoted |> :elixir_expand.expand(env)
     {erl, new_scope} = :elixir_erl_pass.translate(expanded, scope)
     {erl, new_env, new_scope}
   end
 
+  def eval(code_str, binding \\ [], transcript \\ []) do
+    code_str |> string_to_quoted! |> _eval(binding, transcript)
+  end
+
   def eval_quoted(quoted, binding \\ [], transcript \\ []) do
-    env = :elixir.env_for_eval([])
-    scope = :elixir_env.env_to_scope(env)
+    quoted |> _eval(binding, transcript)
+  end
+
+  defp _eval(code, binding, transcript) do
+    env = [] |> :elixir.env_for_eval
+    scope = env |> :elixir_env.env_to_scope
 
     {parsed_binding, parsed_vars, parsed_scope} = :elixir_erl_var.load_binding(binding, scope)
     parsed_env = :elixir_env.with_vars(env, parsed_vars)
-    {erl, _new_env, new_scope} = quoted_to_erl(quoted, parsed_env, parsed_scope)
+    {erl, _new_env, new_scope} = quoted_to_erl(code, parsed_env, parsed_scope)
     {:ok, buffer} = Agent.start_link(fn -> [i: 0, transcript: transcript] end)
 
     res =
@@ -117,17 +122,17 @@ defmodule EvalSandbox.Traced2Evaluator do
         _ ->
           try do
             {:value, value, new_binding} =
-              :erl_eval.expr(erl, parsed_binding, :none, {:value, nlfh(buffer)}, :none)
+              :erl_eval.expr(erl, parsed_binding, :none, {:value, function_call(buffer)}, :none)
 
             {:value, value, :elixir_erl_var.dump_binding(new_binding, new_scope),
-             Keyword.get(Agent.get(buffer, fn data -> data end), :transcript)}
+             buffer |> Agent.get(&(&1)) |> Keyword.get(:transcript)}
           catch
             :__suspend__ ->
-              {:suspension, Keyword.get(Agent.get(buffer, fn data -> data end), :transcript)}
+              {:suspension, buffer |> Agent.get(&(&1)) |> Keyword.get(:transcript)}
           end
       end
 
-    Agent.stop(buffer)
+    buffer |> Agent.stop
     res
   end
 end
