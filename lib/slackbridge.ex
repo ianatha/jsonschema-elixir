@@ -1,4 +1,6 @@
 defmodule Slackbridge do
+  import EvalSandbox.Traced2Evaluator, only: [defasync: 2]
+
   def slack_interactive(event) do
     %{"actions" => actions} = event
     selected_action = hd(actions)["value"]
@@ -37,7 +39,7 @@ defmodule Slackbridge do
     Agent.update(__MODULE__, fn _ -> {output, bindings} end)
   end
 
-  def ss_ask_question(ts, recp, msg, question) do
+  defasync ss_ask_question(ts, recp, msg, question) do
     yes_no_question(recp, msg, question, "123", ts)
     throw(:__suspend__)
   end

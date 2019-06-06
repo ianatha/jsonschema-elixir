@@ -3,6 +3,7 @@ defmodule EvalSandboxTraced2Test do
 
   import EvalSandbox.Traced2Evaluator,
     only: [
+      defasync: 2,
       enrich_with_result: 2,
       eval: 1,
       eval: 2,
@@ -77,7 +78,7 @@ defmodule EvalSandboxTraced2Test do
            ]
   end
 
-  def suspending_function() do
+  defasync suspending_function() do
     throw(:__suspend__)
   end
 
