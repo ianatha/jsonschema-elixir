@@ -9,9 +9,7 @@ defmodule EvaluatorTest do
       eval: 1,
       eval: 2,
       eval: 3,
-      eval_quoted: 1,
-      eval_quoted: 2,
-      eval_quoted: 3
+      eval_quoted: 2
     ]
 
   test "simple addition" do
@@ -136,18 +134,5 @@ defmodule EvaluatorTest do
              {:fn, :erlang, :+, [1, 10], 11},
              {:fn, :erlang, :+, [11, 100], 111}
            ]
-  end
-
-  test "with taskserver" do
-    code = """
-      x = 1
-      y = EvaluatorTest.suspending_function()
-      z = EvaluatorTest.suspending_function()
-      x + y + z
-    """
-
-    {:ok, taskserver} = Taskserver.start_link([])
-    Taskserver.work(taskserver)
-    IO.puts("some work")
   end
 end

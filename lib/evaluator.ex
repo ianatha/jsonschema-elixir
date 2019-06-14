@@ -59,6 +59,8 @@ defmodule Evaluator do
     result
   end
 
+  def enrich_with_result(transcript, result)
+
   def enrich_with_result([], _), do: []
 
   def enrich_with_result([h | t], res),
