@@ -1,9 +1,10 @@
-defmodule EvalSandboxTraced2Test do
+defmodule EvaluatorTest do
   use ExUnit.Case
 
-  import EvalSandbox.Traced2Evaluator,
+  import Interruptible
+
+  import Evaluator,
     only: [
-      defasync: 2,
       enrich_with_result: 2,
       eval: 1,
       eval: 2,
@@ -45,7 +46,7 @@ defmodule EvalSandboxTraced2Test do
     {:value, value, bindings, transcript} = eval_quoted(code, b: 0)
 
     assert value == 5
-    assert bindings == [{:b, 0}, {{:a, EvalSandboxTraced2Test}, 5}, {{:x, EvalSandboxTraced2Test}, 2}]
+    assert bindings == [{:b, 0}, {{:a, EvaluatorTest}, 5}, {{:x, EvaluatorTest}, 2}]
     assert transcript == [{:fn, :erlang, :+, [2, 3], 5}, {:fn, :erlang, :+, [5, 0], 5}]
   end
 
@@ -85,13 +86,13 @@ defmodule EvalSandboxTraced2Test do
   test "suspension signaled" do
     code = """
       x = 2 + 3
-      EvalSandboxTraced2Test.suspending_function()
+      EvaluatorTest.suspending_function()
     """
 
     {:suspension,
      [
        {:fn, :erlang, :+, [2, 3], 5},
-       {:fn_suspended, EvalSandboxTraced2Test, :suspending_function, []}
+       {:fn_suspended, EvaluatorTest, :suspending_function, []}
      ]} = eval(code)
   end
 
@@ -106,8 +107,8 @@ defmodule EvalSandboxTraced2Test do
   test "resurrecting suspended task" do
     code = """
       x = 1
-      y = EvalSandboxTraced2Test.suspending_function()
-      z = EvalSandboxTraced2Test.suspending_function()
+      y = EvaluatorTest.suspending_function()
+      z = EvaluatorTest.suspending_function()
       x + y + z
     """
 
@@ -130,10 +131,23 @@ defmodule EvalSandboxTraced2Test do
            ]
 
     assert transcript3 == [
-             {:fn, EvalSandboxTraced2Test, :suspending_function, [], 10},
-             {:fn, EvalSandboxTraced2Test, :suspending_function, [], 100},
+             {:fn, EvaluatorTest, :suspending_function, [], 10},
+             {:fn, EvaluatorTest, :suspending_function, [], 100},
              {:fn, :erlang, :+, [1, 10], 11},
              {:fn, :erlang, :+, [11, 100], 111}
            ]
+  end
+
+  test "with taskserver" do
+    code = """
+      x = 1
+      y = EvaluatorTest.suspending_function()
+      z = EvaluatorTest.suspending_function()
+      x + y + z
+    """
+
+    {:ok, taskserver} = Taskserver.start_link([])
+    Taskserver.work(taskserver)
+    IO.puts("some work")
   end
 end

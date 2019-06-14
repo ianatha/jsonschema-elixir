@@ -1,6 +1,5 @@
 defmodule Slackbridge do
-  import EvalSandbox.Traced2Evaluator, only: [defasync: 2]
-
+  import Interruptible, only: [defasync: 2]
   def slack_interactive(event) do
     %{"actions" => actions} = event
     selected_action = hd(actions)["value"]
@@ -71,19 +70,16 @@ defmodule Slackbridge do
 
   def resume_task(result) do
     {{:suspension, transcript}, bindings} = Agent.get(__MODULE__, & &1)
-    t2 = EvalSandbox.Traced2Evaluator.enrich_with_result(transcript, result)
-    output = EvalSandbox.Traced2Evaluator.eval(@code, bindings, t2)
+    t2 = Evaluator.enrich_with_result(transcript, result)
+    output = Evaluator.eval(@code, bindings, t2)
     Agent.update(__MODULE__, fn _ -> {output, bindings} end)
   end
-
   def start_task(code, bindings) do
-    EvalSandbox.Traced2Evaluator.eval(code, bindings)
+    Evaluator.eval(code, bindings)
   end
-
   def initiate(ts) do
     task(@code, [ts: ts])
   end
-
   def yes_no_question(recp, msg, question, cb_id, ts) do
     multiple_choice_question(
       recp,
@@ -97,7 +93,6 @@ defmodule Slackbridge do
       ts
     )
   end
-
   def multiple_choice_question(recp, msg, question, actions, cb_id, ts) do
     attachments =
       [

@@ -1,47 +1,6 @@
-defmodule EvalSandbox.Traced2Evaluator do
+defmodule Evaluator do
   require Keyword, as: KW
   import Code, only: [string_to_quoted!: 1]
-
-  defguard is_literal(x)
-           when is_atom(x) or is_binary(x) or is_bitstring(x) or is_boolean(x) or is_number(x) or
-                  is_list(x)
-
-  defmacro defasync(name, do: block) do
-    x = Macro.escape(block)
-    caller = Macro.escape(__CALLER__)
-    quote do
-      def unquote(name) do
-        IO.inspect({:async, unquote(x), unquote(caller)})
-        unquote(instrument(block))
-      end
-    end
-  end
-
-  defp x(c) when is_literal(c), do: c
-  defp x({_1, _2} = c), do: c
-  defp x({_varname, _meta, nil} = c), do: c
-  defp x({fnname, _meta, args} = c) when is_atom(fnname) and is_list(args) do
-    if not Macro.special_form?(fnname, length(args)) do
-      quote do
-        IO.inspect({:call, unquote(fnname)})
-        unquote(c)
-      end
-    else
-      c
-    end
-  end
-  defp x({{:., _fnmeta, fnpath}, _meta, args} = c) when is_list(fnpath) and is_list(args) do
-        quote do: EvalSandbox.Traced2Evaluator.random_func(unquote(c))
-        # Macro.special_form?(name, arity)
-  end
-
-  defp instrument(code, acc) do
-    {x(code), acc}
-  end
-
-  defp instrument(code) do
-    Macro.postwalk(code, 0, &instrument/2)
-  end
 
   defp function_call(buffer), do: &function_call(buffer, &1, &2)
 
@@ -51,7 +10,8 @@ defmodule EvalSandbox.Traced2Evaluator do
 
   defp function_call(buffer, {module, func}, args) do
     cache_result =
-      buffer |> Agent.get(fn acc ->
+      buffer
+      |> Agent.get(fn acc ->
         case Enum.at(acc |> KW.get(:transcript), acc |> KW.get(:i)) do
           {:fn, ^module, ^func, ^args, result} -> {:from_cache, result}
           nil -> {:none}
@@ -62,7 +22,8 @@ defmodule EvalSandbox.Traced2Evaluator do
     result =
       case cache_result do
         {:from_cache, result} ->
-          buffer |> Agent.update(fn acc ->
+          buffer
+          |> Agent.update(fn acc ->
             acc
             |> KW.update!(:i, fn i -> i + 1 end)
           end)
@@ -73,7 +34,8 @@ defmodule EvalSandbox.Traced2Evaluator do
           try do
             result = :erlang.apply(module, func, args)
 
-            buffer |> Agent.update(fn acc ->
+            buffer
+            |> Agent.update(fn acc ->
               acc
               |> KW.update!(:i, fn i -> i + 1 end)
               |> KW.update!(:transcript, fn t -> t ++ [{:fn, module, func, args, result}] end)
@@ -82,7 +44,8 @@ defmodule EvalSandbox.Traced2Evaluator do
             result
           catch
             :__suspend__ ->
-              buffer |> Agent.update(fn acc ->
+              buffer
+              |> Agent.update(fn acc ->
                 acc
                 |> KW.update!(:transcript, fn t -> t ++ [{:fn_suspended, module, func, args}] end)
               end)
@@ -122,8 +85,8 @@ defmodule EvalSandbox.Traced2Evaluator do
   end
 
   defp _eval(code, binding, transcript) do
-    env = [] |> :elixir.env_for_eval
-    scope = env |> :elixir_env.env_to_scope
+    env = [] |> :elixir.env_for_eval()
+    scope = env |> :elixir_env.env_to_scope()
 
     {parsed_binding, parsed_vars, parsed_scope} = :elixir_erl_var.load_binding(binding, scope)
     parsed_env = :elixir_env.with_vars(env, parsed_vars)
@@ -141,14 +104,14 @@ defmodule EvalSandbox.Traced2Evaluator do
               :erl_eval.expr(erl, parsed_binding, :none, {:value, function_call(buffer)}, :none)
 
             {:value, value, :elixir_erl_var.dump_binding(new_binding, new_scope),
-             buffer |> Agent.get(&(&1)) |> Keyword.get(:transcript)}
+             buffer |> Agent.get(& &1) |> Keyword.get(:transcript)}
           catch
             :__suspend__ ->
-              {:suspension, buffer |> Agent.get(&(&1)) |> Keyword.get(:transcript)}
+              {:suspension, buffer |> Agent.get(& &1) |> Keyword.get(:transcript)}
           end
       end
 
-    buffer |> Agent.stop
+    buffer |> Agent.stop()
     res
   end
 end
